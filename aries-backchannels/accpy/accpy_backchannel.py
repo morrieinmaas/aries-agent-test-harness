@@ -9,9 +9,29 @@ import uuid
 from timeit import default_timer
 from time import sleep
 
-from python.agent_backchannel import AgentBackchannel, default_genesis_txns, RUN_MODE, START_TIMEOUT
-from python.utils import require_indy, flatten, log_json, log_msg, log_timer, output_reader, prompt_loop
-from python.storage import store_resource, get_resource, delete_resource, push_resource, pop_resource, pop_resource_latest
+from python.agent_backchannel import (
+    AgentBackchannel,
+    default_genesis_txns,
+    RUN_MODE,
+    START_TIMEOUT,
+)
+from python.utils import (
+    require_indy,
+    flatten,
+    log_json,
+    log_msg,
+    log_timer,
+    output_reader,
+    prompt_loop,
+)
+from python.storage import (
+    store_resource,
+    get_resource,
+    delete_resource,
+    push_resource,
+    pop_resource,
+    pop_resource_latest,
+)
 
 import aries_cloudcontroller
 
@@ -21,40 +41,36 @@ import aries_cloudcontroller
 
 class AccPyAgentBackchannel(AgentBackchannel):
     def __init__(
-        self, 
+        self,
         ident: str,
         http_port: int,
         admin_port: int,
         genesis_data: str = None,
-        params: dict = {}
+        params: dict = {},
     ):
-        super().__init__(
-            ident,
-            http_port,
-            admin_port,
-            genesis_data,
-            params
-        )
+        super().__init__(ident, http_port, admin_port, genesis_data, params)
 
-        self.agent_controller = aries_cloudcontroller.AriesAgentController(admin_url = f"http://localhost:{http_port}", api_key = None, is_multitenant = True)
+        self.agent_controller = aries_cloudcontroller.AriesAgentController(
+            admin_url=f"http://localhost:{http_port}", api_key=None, is_multitenant=True
+        )
         # get aca-py version if available
         self.acapy_version = None
         try:
-            with open('./acapy-version.txt', 'r') as file:
+            with open("./acapy-version.txt", "r") as file:
                 self.acapy_version = file.readline()
         except:
             # ignore errors
             pass
 
         # set the acapy AIP version, defaulting to AIP10
-        self.aip_version = "AIP10" 
+        self.aip_version = "AIP10"
 
         # Aca-py : RFC
         self.connectionStateTranslationDict = {
             "invitation": "invited",
             "request": "requested",
             "response": "responded",
-            "active": "complete"
+            "active": "complete",
         }
 
         # Aca-py : RFC
@@ -67,7 +83,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
             "request_received": "request-received",
             "credential_issued": "credential-issued",
             "credential_received": "credential-received",
-            "credential_acked": "done"
+            "credential_acked": "done",
         }
 
         # AATH API : Acapy Admin API
@@ -76,7 +92,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
             "send-offer": "send-offer",
             "send-request": "send-request",
             "issue": "issue",
-            "store": "store"
+            "store": "store",
         }
 
         # AATH API : Acapy Admin API
@@ -85,14 +101,14 @@ class AccPyAgentBackchannel(AgentBackchannel):
             "send-presentation": "send-presentation",
             "send-request": "send-request",
             "verify-presentation": "verify-presentation",
-            "send-proposal": "send-proposal"
-        }        
+            "send-proposal": "send-proposal",
+        }
 
         # AATH API : Acapy Admin API
         self.TopicTranslationDict = {
             "issue-credential": "/issue-credential/",
             "issue-credential-v2": "/issue-credential-2.0/",
-            "proof-v2": "/present-proof-2.0/"
+            "proof-v2": "/present-proof-2.0/",
         }
 
         # Aca-py : RFC
@@ -105,7 +121,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
             "presentation_received": "presentation-received",
             "reject_sent": "reject-sent",
             "verified": "done",
-            "presentation_acked": "done"
+            "presentation_acked": "done",
         }
 
         # Aca-py : RFC
@@ -113,19 +129,19 @@ class AccPyAgentBackchannel(AgentBackchannel):
             "initial": "invitation-sent",
             "invitation": "invitation-received",
             "request": "request-received",
-            "response": "response-sent", 
+            "response": "response-sent",
             "?": "abandoned",
-            "active": "completed"
+            "active": "completed",
         }
 
         # Aca-py : RFC
         self.didExchangeRequesterStateTranslationDict = {
-            "initial": "invitation-sent", 
+            "initial": "invitation-sent",
             "invitation": "invitation-received",
-            "request": "request-sent", 
-            "response": "response-received", 
+            "request": "request-sent",
+            "response": "response-received",
             "?": "abandoned",
-            "active": "completed"
+            "active": "completed",
         }
 
     def get_acapy_version_as_float(self):
@@ -141,7 +157,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
         descriptiveTrailer = "-"
         comparibleVersion = self.acapy_version
         if comparibleVersion.startswith("0"):
-            comparibleVersion = comparibleVersion[len("0"):]
+            comparibleVersion = comparibleVersion[len("0") :]
         if "." in comparibleVersion:
             stringParts = comparibleVersion.split(".")
             comparibleVersion = "".join(stringParts)
@@ -157,10 +173,10 @@ class AccPyAgentBackchannel(AgentBackchannel):
         result = [
             ("--endpoint", self.endpoint),
             ("--label", self.label),
-            #"--auto-ping-connection",
-            #"--auto-accept-invites", 
-            #"--auto-accept-requests", 
-            #"--auto-respond-messages",
+            # "--auto-ping-connection",
+            # "--auto-accept-invites",
+            # "--auto-accept-requests",
+            # "--auto-respond-messages",
             ("--inbound-transport", "http", "0.0.0.0", str(self.http_port)),
             ("--outbound-transport", "http"),
             ("--admin", "0.0.0.0", str(self.admin_port)),
@@ -190,106 +206,141 @@ class AccPyAgentBackchannel(AgentBackchannel):
             )
         if self.webhook_url:
             result.append(("--webhook-url", self.webhook_url))
-        
-        # This code for Tails Server is included here because aca-py does not support the env var directly yet. 
-        # when it does (and there is talk of supporting YAML) then this code can be removed. 
-        if os.getenv('TAILS_SERVER_URL') is not None:
+
+        # This code for Tails Server is included here because aca-py does not support the env var directly yet.
+        # when it does (and there is talk of supporting YAML) then this code can be removed.
+        if os.getenv("TAILS_SERVER_URL") is not None:
             # if the env var is set for tails server then use that.
-            result.append(("--tails-server-base-url", os.getenv('TAILS_SERVER_URL')))
+            result.append(("--tails-server-base-url", os.getenv("TAILS_SERVER_URL")))
         else:
             # if the tails server env is not set use the gov.bc TEST tails server.
-            result.append(("--tails-server-base-url", "https://tails-server-test.pathfinder.gov.bc.ca"))
-        
-        if AIP_CONFIG >= 20 or os.getenv('EMIT-NEW-DIDCOMM-PREFIX') is not None:
+            result.append(
+                (
+                    "--tails-server-base-url",
+                    "https://tails-server-test.pathfinder.gov.bc.ca",
+                )
+            )
+
+        if AIP_CONFIG >= 20 or os.getenv("EMIT-NEW-DIDCOMM-PREFIX") is not None:
             # if the env var is set for tails server then use that.
             result.append(("--emit-new-didcomm-prefix"))
 
-        if AIP_CONFIG >= 20 or os.getenv('EMIT-NEW-DIDCOMM-MIME-TYPE') is not None:
+        if AIP_CONFIG >= 20 or os.getenv("EMIT-NEW-DIDCOMM-MIME-TYPE") is not None:
             # if the env var is set for tails server then use that.
             result.append(("--emit-new-didcomm-mime-type"))
 
-        # This code for log level is included here because aca-py does not support the env var directly yet. 
-        # when it does (and there is talk of supporting YAML) then this code can be removed. 
-        if os.getenv('LOG_LEVEL') is not None:
-            result.append(("--log-level", os.getenv('LOG_LEVEL')))
+        # This code for log level is included here because aca-py does not support the env var directly yet.
+        # when it does (and there is talk of supporting YAML) then this code can be removed.
+        if os.getenv("LOG_LEVEL") is not None:
+            result.append(("--log-level", os.getenv("LOG_LEVEL")))
 
         # result.append(("--trace", "--trace-target", "log", "--trace-tag", "acapy.events", "--trace-label", "acapy",))
 
-        #if self.extra_args:
+        # if self.extra_args:
         #    result.extend(self.extra_args)
 
         return result
-    
+
     def agent_state_translation(self, topic, operation, data):
-            # This method is used to translate the agent states passes back in the responses of operations into the states the 
-            # test harness expects. The test harness expects states to be as they are written in the Protocol's RFC.
-            # the following is what the tests/rfc expect vs what aca-py communicates
-            # Connection Protocol:
-            # Tests/RFC         |   Aca-py
-            # invited           |   invitation
-            # requested         |   request
-            # responded         |   response
-            # complete          |   active
-            #
-            # Issue Credential Protocol:
-            # Tests/RFC         |   Aca-py
-            # proposal-sent     |   proposal_sent
-            # proposal-received |   proposal_received
-            # offer-sent        |   offer_sent
-            # offer_received    |   offer_received
-            # request-sent      |   request_sent
-            # request-received  |   request_received
-            # credential-issued |   issued
-            # credential-received | credential_received
-            # done              |   credential_acked
-            #
-            # Present Proof Protocol:
-            # Tests/RFC         |   Aca-py
+        # This method is used to translate the agent states passes back in the responses of operations into the states the
+        # test harness expects. The test harness expects states to be as they are written in the Protocol's RFC.
+        # the following is what the tests/rfc expect vs what aca-py communicates
+        # Connection Protocol:
+        # Tests/RFC         |   Aca-py
+        # invited           |   invitation
+        # requested         |   request
+        # responded         |   response
+        # complete          |   active
+        #
+        # Issue Credential Protocol:
+        # Tests/RFC         |   Aca-py
+        # proposal-sent     |   proposal_sent
+        # proposal-received |   proposal_received
+        # offer-sent        |   offer_sent
+        # offer_received    |   offer_received
+        # request-sent      |   request_sent
+        # request-received  |   request_received
+        # credential-issued |   issued
+        # credential-received | credential_received
+        # done              |   credential_acked
+        #
+        # Present Proof Protocol:
+        # Tests/RFC         |   Aca-py
 
-            resp_json = json.loads(data)
-            # Check to see if state is in the json
-            if "state" in resp_json:
-                agent_state = resp_json["state"]
+        resp_json = json.loads(data)
+        # Check to see if state is in the json
+        if "state" in resp_json:
+            agent_state = resp_json["state"]
 
-                # if "did_exchange" in topic:
-                #     if "rfc23_state" in resp_json:
-                #         rfc_state = resp_json["rfc23_state"]
-                #     else:
-                #         rfc_state = resp_json["connection"]["rfc23_state"]
-                #     data = data.replace('"state"' + ": " + '"' + agent_state + '"', '"state"' + ": " + '"' + rfc_state + '"')
-                # else:
-                # Check the thier_role property in the data and set the calling method to swap states to the correct role for DID Exchange
-                if "their_role" in data:
-                    #if resp_json["connection"]["their_role"] == "invitee":
-                    if "invitee" in data:
-                        de_state_trans_method = self.didExchangeResponderStateTranslationDict
-                    elif "inviter" in data:
-                        de_state_trans_method = self.didExchangeRequesterStateTranslationDict
+            # if "did_exchange" in topic:
+            #     if "rfc23_state" in resp_json:
+            #         rfc_state = resp_json["rfc23_state"]
+            #     else:
+            #         rfc_state = resp_json["connection"]["rfc23_state"]
+            #     data = data.replace('"state"' + ": " + '"' + agent_state + '"', '"state"' + ": " + '"' + rfc_state + '"')
+            # else:
+            # Check the thier_role property in the data and set the calling method to swap states to the correct role for DID Exchange
+            if "their_role" in data:
+                # if resp_json["connection"]["their_role"] == "invitee":
+                if "invitee" in data:
+                    de_state_trans_method = (
+                        self.didExchangeResponderStateTranslationDict
+                    )
+                elif "inviter" in data:
+                    de_state_trans_method = (
+                        self.didExchangeRequesterStateTranslationDict
+                    )
+            else:
+                # make the trans method any one, since it doesn't matter. It's probably Out of Band.
+                de_state_trans_method = self.didExchangeResponderStateTranslationDict
+
+            if topic == "connection":
+                # if the response contains invitation id, swap out the connection states for the did exchange states
+                if "invitation_msg_id" in data:
+                    data = data.replace(
+                        '"state"' + ": " + '"' + agent_state + '"',
+                        '"state"'
+                        + ": "
+                        + '"'
+                        + de_state_trans_method[agent_state]
+                        + '"',
+                    )
                 else:
-                    # make the trans method any one, since it doesn't matter. It's probably Out of Band.
-                    de_state_trans_method = self.didExchangeResponderStateTranslationDict
-
-                if topic == "connection":
-                    # if the response contains invitation id, swap out the connection states for the did exchange states
-                    if "invitation_msg_id" in data:
-                        data = data.replace('"state"' + ": " + '"' + agent_state + '"', '"state"' + ": " + '"' + de_state_trans_method[agent_state] + '"')
-                    else:
-                        data = data.replace(agent_state, self.connectionStateTranslationDict[agent_state])
-                elif topic == "issue-credential":
-                    data = data.replace(agent_state, self.issueCredentialStateTranslationDict[agent_state])
-                elif topic == "proof":
-                    data = data.replace('"state"' + ": " + '"' + agent_state + '"', '"state"' + ": " + '"' + self.presentProofStateTranslationDict[agent_state] + '"')
-                elif topic == "out-of-band":
-                    data = data.replace('"state"' + ": " + '"' + agent_state + '"', '"state"' + ": " + '"' + de_state_trans_method[agent_state] + '"')
-                elif topic == "did-exchange":
-                    data = data.replace('"state"' + ": " + '"' + agent_state + '"', '"state"' + ": " + '"' + de_state_trans_method[agent_state] + '"')
-            return (data)
+                    data = data.replace(
+                        agent_state, self.connectionStateTranslationDict[agent_state]
+                    )
+            elif topic == "issue-credential":
+                data = data.replace(
+                    agent_state, self.issueCredentialStateTranslationDict[agent_state]
+                )
+            elif topic == "proof":
+                data = data.replace(
+                    '"state"' + ": " + '"' + agent_state + '"',
+                    '"state"'
+                    + ": "
+                    + '"'
+                    + self.presentProofStateTranslationDict[agent_state]
+                    + '"',
+                )
+            elif topic == "out-of-band":
+                data = data.replace(
+                    '"state"' + ": " + '"' + agent_state + '"',
+                    '"state"' + ": " + '"' + de_state_trans_method[agent_state] + '"',
+                )
+            elif topic == "did-exchange":
+                data = data.replace(
+                    '"state"' + ": " + '"' + agent_state + '"',
+                    '"state"' + ": " + '"' + de_state_trans_method[agent_state] + '"',
+                )
+        return data
 
     async def listen_webhooks(self, webhook_port: str):
         self.webhook_port = webhook_port
-        self.agent_controller.init_webhook_server(webhook_host = "localhost", webhook_port = self.webhook_port)
+        self.agent_controller.init_webhook_server(
+            webhook_host="localhost", webhook_port=self.webhook_port
+        )
         await self.agent_controller.listen_webhooks()
-        
+
     async def make_agent_POST_request(
         self, op, rec_id=None, data=None, text=False, params=None
     ) -> (int, str):
@@ -299,13 +350,19 @@ class AccPyAgentBackchannel(AgentBackchannel):
             if operation == "create-invitation":
                 agent_operation = "/connections/" + operation
 
-                (resp_status, resp_text) = await self.agent_controller.connections.create_invitation()
+                (
+                    resp_status,
+                    resp_text,
+                ) = await self.agent_controller.connections.create_invitation()
 
                 # extract invitation from the agent's response
                 invitation_resp = json.loads(resp_text)
                 resp_text = json.dumps(invitation_resp)
 
-                if resp_status == 200: resp_text = self.agent_state_translation(op["topic"], operation, resp_text)
+                if resp_status == 200:
+                    resp_text = self.agent_state_translation(
+                        op["topic"], operation, resp_text
+                    )
                 return (resp_status, resp_text)
 
         #     elif operation == "receive-invitation":
@@ -315,7 +372,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #         if resp_status == 200: resp_text = self.agent_state_translation(op["topic"], None, resp_text)
         #         return (resp_status, resp_text)
 
-        #     elif (operation == "accept-invitation" 
+        #     elif (operation == "accept-invitation"
         #         or operation == "accept-request"
         #         or operation == "remove"
         #         or operation == "start-introduction"
@@ -361,7 +418,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #     if rec_id is None:
         #         agent_operation = acapy_topic + operation
         #     else:
-        #         if (operation == "send-offer" 
+        #         if (operation == "send-offer"
         #             or operation == "send-request"
         #             or operation == "issue"
         #             or operation == "store"
@@ -378,21 +435,21 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #             data = None
         #         else:
         #             agent_operation = acapy_topic + operation
-            
+
         #     log_msg(agent_operation, data)
-            
+
         #     (resp_status, resp_text) = await self.admin_POST(agent_operation, data)
 
         #     log_msg(resp_status, resp_text)
         #     if resp_status == 200 and self.aip_version != "AIP20": resp_text = self.agent_state_translation(op["topic"], None, resp_text)
         #     return (resp_status, resp_text)
 
-        # # Handle issue credential v2 POST operations 
+        # # Handle issue credential v2 POST operations
         # elif op["topic"] == "issue-credential-v2":
         #     (resp_status, resp_text) = await self.handle_issue_credential_v2_POST(op, rec_id=rec_id, data=data)
         #     return (resp_status, resp_text)
 
-        # # Handle issue credential v2 POST operations 
+        # # Handle issue credential v2 POST operations
         # elif op["topic"] == "proof-v2":
         #     (resp_status, resp_text) = await self.handle_proof_v2_POST(op, rec_id=rec_id, data=data)
         #     return (resp_status, resp_text)
@@ -402,9 +459,9 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #     #self.acapy_version = "0.5.5-RC"
         #     operation = op["operation"]
         #     agent_operation, admin_data = await self.get_agent_operation_acapy_version_based(op["topic"], operation, rec_id, data)
-            
+
         #     log_msg(agent_operation, admin_data)
-            
+
         #     if admin_data is None:
         #         (resp_status, resp_text) = await self.admin_POST(agent_operation)
         #     else:
@@ -421,12 +478,12 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #     if rec_id is None:
         #         agent_operation = "/present-proof/" + operation
         #     else:
-        #         if (operation == "send-presentation" 
+        #         if (operation == "send-presentation"
         #             or operation == "send-request"
         #             or operation == "verify-presentation"
         #             or operation == "remove"
         #         ):
-                    
+
         #             if (operation not in "send-presentation" or operation not in "send-request") and (data is None or "~service" not in data):
         #                 # swap thread id for pres ex id from the webhook
         #                 pres_ex_id = await self.swap_thread_id_for_exchange_id(rec_id, "presentation-msg", "presentation_exchange_id")
@@ -437,7 +494,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
 
         #         else:
         #             agent_operation = "/present-proof/" + operation
-            
+
         #     log_msg(agent_operation, data)
 
         #     if data is not None:
@@ -449,8 +506,8 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #     log_msg(resp_status, resp_text)
         #     if resp_status == 200: resp_text = self.agent_state_translation(op["topic"], None, resp_text)
         #     return (resp_status, resp_text)
-        
-        # # Handle out of band POST operations 
+
+        # # Handle out of band POST operations
         # elif op["topic"] == "out-of-band":
         #     (resp_status, resp_text) = await self.handle_out_of_band_POST(op, data=data)
         #     return (resp_status, resp_text)
@@ -460,7 +517,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
         #     (resp_status, resp_text) = await self.handle_did_exchange_POST(op, rec_id=rec_id, data=data)
         #     return (resp_status, resp_text)
 
-        return (501, '501: Not Implemented\n\n'.encode('utf8'))
+        return (501, "501: Not Implemented\n\n".encode("utf8"))
 
     async def make_agent_GET_request(
         self, op, rec_id=None, text=False, params=None
@@ -470,40 +527,50 @@ class AccPyAgentBackchannel(AgentBackchannel):
             status = 200 if self.ACTIVE else 418
             status_msg = "Active" if self.ACTIVE else "Inactive"
             return (status, json.dumps({"status": status_msg}))
-        
+
         if op["topic"] == "version":
             if self.acapy_version is not None:
                 status = 200
-                #status_msg = json.dumps({"version": self.acapy_version})
+                # status_msg = json.dumps({"version": self.acapy_version})
                 status_msg = self.acapy_version
             else:
                 status = 404
-                #status_msg = json.dumps({"version": "not found"})
+                # status_msg = json.dumps({"version": "not found"})
                 status_msg = "not found"
             return (status, status_msg)
 
         elif op["topic"] == "connection":
             if rec_id:
-                (resp_status, resp_text) = await self.agent_controller.get_connection(connection_id = rec_id)
+                (resp_status, resp_text) = await self.agent_controller.get_connection(
+                    connection_id=rec_id
+                )
             else:
                 (resp_status, resp_text) = await self.agent_controller.get_connections()
-            
-            log_msg('GET Request agent operation: ', agent_operation)
+
+            log_msg("GET Request agent operation: ", agent_operation)
 
             if resp_status != 200:
                 return (resp_status, resp_text)
 
-            log_msg('GET Request response details: ', resp_status, resp_text)
+            log_msg("GET Request response details: ", resp_status, resp_text)
 
             resp_json = json.loads(resp_text)
             if rec_id:
-                connection_info = {"connection_id": resp_json["connection_id"], "state": resp_json["state"], "connection": resp_json}
+                connection_info = {
+                    "connection_id": resp_json["connection_id"],
+                    "state": resp_json["state"],
+                    "connection": resp_json,
+                }
                 resp_text = json.dumps(connection_info)
             else:
                 resp_json = resp_json["results"]
                 connection_infos = []
                 for connection in resp_json:
-                    connection_info = {"connection_id": connection["connection_id"], "state": connection["state"], "connection": connection}
+                    connection_info = {
+                        "connection_id": connection["connection_id"],
+                        "state": connection["state"],
+                        "connection": connection,
+                    }
                     connection_infos.append(connection_info)
                 resp_text = json.dumps(connection_infos)
             # translate the state from that the agent gave to what the tests expect
@@ -511,7 +578,10 @@ class AccPyAgentBackchannel(AgentBackchannel):
             return (resp_status, resp_text)
 
         elif op["topic"] == "did":
-            (resp_status, resp_text) = await self.agent_controller.wallet.get_public_did()
+            (
+                resp_status,
+                resp_text,
+            ) = await self.agent_controller.wallet.get_public_did()
             if resp_status != 200:
                 return (resp_status, resp_text)
 
@@ -522,7 +592,9 @@ class AccPyAgentBackchannel(AgentBackchannel):
             return (resp_status, resp_text)
 
         elif op["topic"] == "schema":
-            (resp_status, resp_text) = await self.agent_controller.schema.get_by_id(schema_id = rec_id)
+            (resp_status, resp_text) = await self.agent_controller.schema.get_by_id(
+                schema_id=rec_id
+            )
             if resp_status != 200:
                 return (resp_status, resp_text)
 
@@ -533,7 +605,10 @@ class AccPyAgentBackchannel(AgentBackchannel):
             return (resp_status, resp_text)
 
         elif op["topic"] == "credential-definition":
-            (resp_status, resp_text) = await self.agent_controller.definitions.get_by_id(cred_def_id = rec_id)
+            (
+                resp_status,
+                resp_text,
+            ) = await self.agent_controller.definitions.get_by_id(cred_def_id=rec_id)
             if resp_status != 200:
                 return (resp_status, resp_text)
 
@@ -545,10 +620,18 @@ class AccPyAgentBackchannel(AgentBackchannel):
 
         elif op["topic"] == "issue-credential":
             # swap thread id for cred ex id from the webhook
-            cred_ex_id = await self.swap_thread_id_for_exchange_id(rec_id, "credential-msg", "credential_exchange_id")
+            cred_ex_id = await self.swap_thread_id_for_exchange_id(
+                rec_id, "credential-msg", "credential_exchange_id"
+            )
 
-            (resp_status, resp_text) = await self.agent_controller.issuer.get_record_by_id(cred_ex_id = cred_ex_id)
-            if resp_status == 200: resp_text = self.agent_state_translation(op["topic"], None, resp_text)
+            (
+                resp_status,
+                resp_text,
+            ) = await self.agent_controller.issuer.get_record_by_id(
+                cred_ex_id=cred_ex_id
+            )
+            if resp_status == 200:
+                resp_text = self.agent_state_translation(op["topic"], None, resp_text)
             return (resp_status, resp_text)
 
         # elif op["topic"] == "issue-credential-v2":
@@ -562,20 +645,41 @@ class AccPyAgentBackchannel(AgentBackchannel):
 
         elif op["topic"] == "credential":
             operation = op["operation"]
-            if operation == 'revoked':
-                (resp_status, resp_text) = await self.agent_controller.credentials.is_revoked(credential_id = rec_id)
+            if operation == "revoked":
+                (
+                    resp_status,
+                    resp_text,
+                ) = await self.agent_controller.credentials.is_revoked(
+                    credential_id=rec_id
+                )
             else:
-                (resp_status, resp_text) = await self.agent_controller.credentials.get_by_id(credential_id = rec_id)
+                (
+                    resp_status,
+                    resp_text,
+                ) = await self.agent_controller.credentials.get_by_id(
+                    credential_id=rec_id
+                )
 
-            (resp_status, resp_text) = await self.agent_controller.credentials.get_by_id(credential_id = rec_id)
+            (
+                resp_status,
+                resp_text,
+            ) = await self.agent_controller.credentials.get_by_id(credential_id=rec_id)
             return (resp_status, resp_text)
 
         elif op["topic"] == "proof":
             # swap thread id for pres ex id from the webhook
-            pres_ex_id = await self.swap_thread_id_for_exchange_id(rec_id, "presentation-msg", "presentation_exchange_id")
+            pres_ex_id = await self.swap_thread_id_for_exchange_id(
+                rec_id, "presentation-msg", "presentation_exchange_id"
+            )
 
-            (resp_status, resp_text) = await self.agent_controller.proofs.get_record_by_id(pres_ex_id = pres_ex_id)
-            if resp_status == 200: resp_text = self.agent_state_translation(op["topic"], None, resp_text)
+            (
+                resp_status,
+                resp_text,
+            ) = await self.agent_controller.proofs.get_record_by_id(
+                pres_ex_id=pres_ex_id
+            )
+            if resp_status == 200:
+                resp_text = self.agent_state_translation(op["topic"], None, resp_text)
             return (resp_status, resp_text)
 
         # elif op["topic"] == "proof-v2":
@@ -589,24 +693,33 @@ class AccPyAgentBackchannel(AgentBackchannel):
 
         elif op["topic"] == "revocation":
             operation = op["operation"]
-            agent_operation, admin_data = await self.get_agent_operation_acapy_version_based(op["topic"], operation, rec_id, data=None)
+            (
+                agent_operation,
+                admin_data,
+            ) = await self.get_agent_operation_acapy_version_based(
+                op["topic"], operation, rec_id, data=None
+            )
 
-            # TODO determine how to test multiple endpoints here.  
-            (resp_status, resp_text) = await self.agent_controller.revocations.get_revocation_registry(rec_id)
+            # TODO determine how to test multiple endpoints here.
+            (
+                resp_status,
+                resp_text,
+            ) = await self.agent_controller.revocations.get_revocation_registry(rec_id)
             return (resp_status, resp_text)
-        
+
         elif op["topic"] == "did-exchange":
-            
+
             connection_id = rec_id
             agent_operation = "/connections/" + connection_id
 
             (resp_status, resp_text) = await self.admin_GET(agent_operation)
-            if resp_status == 200: resp_text = self.agent_state_translation(op["topic"], None, resp_text)
+            if resp_status == 200:
+                resp_text = self.agent_state_translation(op["topic"], None, resp_text)
             return (resp_status, resp_text)
 
-        return (501, '501: Not Implemented\n\n'.encode('utf8'))
+        return (501, "501: Not Implemented\n\n".encode("utf8"))
 
-     async def make_agent_GET_request_response(
+    async def make_agent_GET_request_response(
         self, topic, rec_id=None, text=False, params=None
     ) -> (int, str):
         if topic == "connection" and rec_id:
@@ -692,7 +805,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
                 resp_text = "{}"
 
             return (resp_status, resp_text)
-        
+
         elif topic == "proof" and rec_id:
             presentation_msg = pop_resource(rec_id, "presentation-msg")
             i = 0
@@ -704,10 +817,11 @@ class AccPyAgentBackchannel(AgentBackchannel):
             resp_status = 200
             if presentation_msg:
                 resp_text = json.dumps(presentation_msg)
-                if resp_status == 200: resp_text = self.agent_state_translation(topic, None, resp_text)
+                if resp_status == 200:
+                    resp_text = self.agent_state_translation(topic, None, resp_text)
             else:
                 resp_text = "{}"
-            
+
             return (resp_status, resp_text)
 
         elif topic == "revocation-registry" and rec_id:
@@ -726,7 +840,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
 
             return (resp_status, resp_text)
 
-        return (501, '501: Not Implemented\n\n'.encode('utf8'))
+        return (501, "501: Not Implemented\n\n".encode("utf8"))
 
     def _process(self, args, env, loop):
         proc = subprocess.Popen(
@@ -749,20 +863,22 @@ class AccPyAgentBackchannel(AgentBackchannel):
         return proc
 
     def get_process_args(self, bin_path: str = None):
-        #TODO aca-py needs to be in the path so no need to give it a cmd_path
+        # TODO aca-py needs to be in the path so no need to give it a cmd_path
         cmd_path = "aca-py"
         if bin_path is None:
             bin_path = DEFAULT_BIN_PATH
         if bin_path:
             cmd_path = os.path.join(bin_path, cmd_path)
-        print ('Location of ACA-Py: ' + cmd_path)
+        print("Location of ACA-Py: " + cmd_path)
         if self.get_acapy_version_as_float() > 56:
             return list(flatten(([cmd_path, "start"], self.get_agent_args())))
         else:
-            return list(flatten((["python3", cmd_path, "start"], self.get_agent_args())))
+            return list(
+                flatten((["python3", cmd_path, "start"], self.get_agent_args()))
+            )
 
     async def detect_process(self):
-        #text = None
+        # text = None
 
         async def fetch_swagger(url: str, timeout: float):
             text = None
@@ -794,7 +910,10 @@ class AccPyAgentBackchannel(AgentBackchannel):
             ok = isinstance(status, dict) and "version" in status
             if ok:
                 self.acapy_version = status["version"]
-                print("ACA-py Backchannel running with ACA-py version:", self.acapy_version)
+                print(
+                    "ACA-py Backchannel running with ACA-py version:",
+                    self.acapy_version,
+                )
         except json.JSONDecodeError:
             pass
         if not ok:
@@ -855,14 +974,14 @@ async def main(start_port: int, show_timing: bool = False, interactive: bool = T
 
     try:
         agent = AccPyAgentBackchannel(
-            "aca-py." + AGENT_NAME, start_port+1, start_port+2, genesis_data=genesis
+            "aca-py." + AGENT_NAME, start_port + 1, start_port + 2, genesis_data=genesis
         )
 
         # start backchannel (common across all types of agents)
         await agent.listen_backchannel(start_port)
 
         # start aca-py agent sub-process and listen for web hooks
-        await agent.listen_webhooks(start_port+3)
+        await agent.listen_webhooks(start_port + 3)
         await agent.register_did()
 
         await agent.start_process()
@@ -870,9 +989,7 @@ async def main(start_port: int, show_timing: bool = False, interactive: bool = T
 
         # now wait ...
         if interactive:
-            async for option in prompt_loop(
-                "(X) Exit? [X] "
-            ):
+            async for option in prompt_loop("(X) Exit? [X] "):
                 if option is None or option in "xX":
                     break
         else:
@@ -894,15 +1011,16 @@ async def main(start_port: int, show_timing: bool = False, interactive: bool = T
     if not terminated:
         os._exit(1)
 
+
 def str2bool(v):
     if isinstance(v, bool):
-       return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 if __name__ == "__main__":
@@ -930,6 +1048,8 @@ if __name__ == "__main__":
     require_indy()
 
     try:
-        asyncio.get_event_loop().run_until_complete(main(start_port=args.port, interactive=args.interactive))
+        asyncio.get_event_loop().run_until_complete(
+            main(start_port=args.port, interactive=args.interactive)
+        )
     except KeyboardInterrupt:
         os._exit(1)
