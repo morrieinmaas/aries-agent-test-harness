@@ -339,7 +339,7 @@ class AccPyAgentBackchannel(AgentBackchannel):
         self.agent_controller.init_webhook_server(
             webhook_host="localhost", webhook_port=self.webhook_port
         )
-        await self.agent_controller.listen_webhooks()
+        # await self.agent_controller.listen_webhooks()
 
     async def make_agent_POST_request(
         self, op, rec_id=None, data=None, text=False, params=None
