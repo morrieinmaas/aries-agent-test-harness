@@ -9,7 +9,7 @@ export DOCKERHOST=${APPLICATION_URL-$(docker run --rm --net=host eclipse/che-ip)
 
 SCRIPT_HOME="$( cd "$( dirname "$0" )" && pwd )"
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-aath}"
-export AGENT_TIMEOUT=30
+export AGENT_TIMEOUT=90
 export LEDGER_TIMEOUT=60
 # these two can be overrode via env vars
 export LEDGER_URL_CONFIG="${LEDGER_URL_CONFIG}"

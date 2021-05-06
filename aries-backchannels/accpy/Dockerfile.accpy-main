@@ -23,7 +23,7 @@ RUN pip install -r accpy/requirements-main.txt
 
 # Copy the necessary files from the AATH Backchannel sub-folders
 COPY python python
-COPY acc-py acc-py
+COPY accpy accpy
 COPY data ./
 
 # aca-py is in /usr/local/bin. The Backchannel is looking for it in ./bin, create a link to it in ./bin
@@ -33,4 +33,4 @@ ENV PYTHONPATH=/aries-backchannels
 
 RUN ./bin/aca-py --version > ./acapy-version.txt
 
-ENTRYPOINT ["bash", "acapy/ngrok-wait.sh"]
+ENTRYPOINT ["bash", "accpy/ngrok-wait.sh"]

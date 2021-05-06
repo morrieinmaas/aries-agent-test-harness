@@ -1,2 +1,2 @@
-aries-cloudcontroller
+aries-cloudcontroller@git+https://github.com/didx-xyz/aries-cloudcontroller-python@accpy
 aries-cloudagent

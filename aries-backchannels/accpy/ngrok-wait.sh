@@ -23,4 +23,4 @@ fi
 
 echo "Starting aca-py agent ..."
 
-python acapy/acapy_backchannel.py "$@"
+python accpy/accpy_backchannel.py "$@"
